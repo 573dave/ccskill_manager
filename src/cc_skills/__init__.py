@@ -27,6 +27,7 @@ try:
     from textual.app import App, ComposeResult
     from textual.binding import Binding
     from textual.containers import Horizontal, Vertical
+    from textual.events import Key as KeyEvent
     from textual.screen import ModalScreen, Screen
     from textual.widgets import (
         Button,
@@ -754,6 +755,8 @@ class InitScreen(ModalScreen[bool]):
     #init-buttons { height: auto; align: center middle; }
     #init-buttons Button { margin: 0 1; }
     """
+    BINDINGS = [Binding("escape", "back", "Back")]
+
     def __init__(self, base: Path):
         super().__init__(); self.base = base
 
@@ -771,6 +774,9 @@ class InitScreen(ModalScreen[bool]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "init-yes")
 
+    def action_back(self) -> None:
+        self.dismiss(False)
+
 
 class MigrateScreen(ModalScreen[bool]):
     CSS = """
@@ -780,6 +786,8 @@ class MigrateScreen(ModalScreen[bool]):
     #mig-buttons { height: auto; align: center middle; }
     #mig-buttons Button { margin: 0 1; }
     """
+    BINDINGS = [Binding("escape", "skip", "Skip")]
+
     def __init__(self, dirs: list[Path]):
         super().__init__(); self.dirs = dirs
 
@@ -795,6 +803,9 @@ class MigrateScreen(ModalScreen[bool]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "mig-yes")
 
+    def action_skip(self) -> None:
+        self.dismiss(False)
+
 
 class PresetSaveScreen(ModalScreen[str | None]):
     CSS = """
@@ -803,6 +814,8 @@ class PresetSaveScreen(ModalScreen[str | None]):
     #save-buttons { height: auto; align: center middle; margin-top: 1; }
     #save-buttons Button { margin: 0 1; }
     """
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
     def compose(self) -> ComposeResult:
         with Vertical(id="save-box"):
             yield Label("Save current selection as preset:")
@@ -814,12 +827,21 @@ class PresetSaveScreen(ModalScreen[str | None]):
     def on_mount(self) -> None:
         self.query_one("#preset-name", Input).focus()
 
+    def _do_save(self) -> None:
+        name = self.query_one("#preset-name", Input).value.strip()
+        self.dismiss(name or None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self._do_save()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "save-yes":
-            name = self.query_one("#preset-name", Input).value.strip()
-            self.dismiss(name or None)
+            self._do_save()
         else:
             self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
 class PresetLoadScreen(ModalScreen["tuple[str | None, str | None]"]):
@@ -830,6 +852,8 @@ class PresetLoadScreen(ModalScreen["tuple[str | None, str | None]"]):
     #load-buttons { height: auto; align: center middle; margin-top: 1; }
     #load-buttons Button { margin: 0 1; }
     """
+    BINDINGS = [Binding("escape", "close", "Close")]
+
     def __init__(self, presets: list[Snapshot]):
         super().__init__()
         self.presets = sorted(presets, key=lambda s: s.name)
@@ -849,6 +873,9 @@ class PresetLoadScreen(ModalScreen["tuple[str | None, str | None]"]):
                 yield Button("Delete", variant="error", id="load-delete")
                 yield Button("Cancel", id="load-no")
 
+    def on_mount(self) -> None:
+        self.query_one("#preset-list", ListView).focus()
+
     def _selected_name(self) -> str | None:
         lv = self.query_one("#preset-list", ListView)
         if lv.highlighted_child and lv.highlighted_child.id and lv.highlighted_child.id.startswith("p-"):
@@ -860,6 +887,10 @@ class PresetLoadScreen(ModalScreen["tuple[str | None, str | None]"]):
                 pass
         return None
 
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        name = self._selected_name()
+        self.dismiss(("load", name) if name else (None, None))
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "load-yes":
             name = self._selected_name()
@@ -869,6 +900,9 @@ class PresetLoadScreen(ModalScreen["tuple[str | None, str | None]"]):
             self.dismiss(("delete", name) if name else (None, None))
         else:
             self.dismiss((None, None))
+
+    def action_close(self) -> None:
+        self.dismiss((None, None))
 
 
 class HistoryScreen(ModalScreen["Snapshot | None"]):
@@ -899,6 +933,21 @@ class HistoryScreen(ModalScreen["Snapshot | None"]):
                 yield Button("Load", variant="primary", id="hist-load")
                 yield Button("Cancel", id="hist-cancel")
 
+    def on_mount(self) -> None:
+        self.query_one("#hist-list", ListView).focus()
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        lv = self.query_one("#hist-list", ListView)
+        if lv.highlighted_child and lv.highlighted_child.id:
+            try:
+                idx = int(lv.highlighted_child.id[2:])
+                if 0 <= idx < len(self.snapshots):
+                    self.dismiss(self.snapshots[idx])
+                    return
+            except ValueError:
+                pass
+        self.dismiss(None)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "hist-load":
             lv = self.query_one("#hist-list", ListView)
@@ -917,14 +966,19 @@ class LocalPathAddScreen(ModalScreen[Path | None]):
     CSS = """
     LocalPathAddScreen { align: center middle; }
     #add-box { width: 70; padding: 1 2; border: thick $primary; background: $surface; }
+    #add-error { color: $error; margin-top: 1; display: none; }
+    #add-error.-visible { display: block; }
     #add-buttons { height: auto; align: center middle; margin-top: 1; }
     #add-buttons Button { margin: 0 1; }
     """
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
     def compose(self) -> ComposeResult:
         with Vertical(id="add-box"):
             yield Label("Add a local path to scan for skills:")
             yield Label("(Either a single skill folder, or a folder containing skill folders.)")
             yield Input(placeholder="/path/to/skills or ~/work/my-skills", id="path-input")
+            yield Label("", id="add-error")
             with Horizontal(id="add-buttons"):
                 yield Button("Add", variant="primary", id="add-yes")
                 yield Button("Cancel", id="add-no")
@@ -932,13 +986,35 @@ class LocalPathAddScreen(ModalScreen[Path | None]):
     def on_mount(self) -> None:
         self.query_one("#path-input", Input).focus()
 
+    def _try_add(self) -> None:
+        raw = self.query_one("#path-input", Input).value.strip()
+        if not raw:
+            self._show_error("Please enter a path.")
+            return
+        p = Path(raw).expanduser().resolve()
+        if not p.exists():
+            self._show_error(f"Path not found: {p}")
+            return
+        if not p.is_dir():
+            self._show_error(f"Not a directory: {p}")
+            return
+        self.dismiss(p)
+
+    def _show_error(self, msg: str) -> None:
+        err = self.query_one("#add-error", Label)
+        err.update(f"⚠ {msg}")
+        err.add_class("-visible")
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self._try_add()
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "add-yes":
-            raw = self.query_one("#path-input", Input).value.strip()
-            if raw:
-                p = Path(raw).expanduser().resolve()
-                if p.exists() and p.is_dir():
-                    self.dismiss(p); return
+            self._try_add()
+        else:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
         self.dismiss(None)
 
 
@@ -1038,6 +1114,8 @@ class MainScreen(Screen):
     #warning.-hidden { display: none; }
     #status { padding: 0 1; background: $boost; color: $text-muted; }
     #groups { height: 1fr; margin: 0 1; }
+    #empty-state { padding: 1 2; color: $text-muted; display: none; }
+    #empty-state.-visible { display: block; }
     .group-list { height: auto; max-height: 20; }
     Collapsible { margin-bottom: 0; }
     """
@@ -1068,6 +1146,7 @@ class MainScreen(Screen):
         yield Input(placeholder="filter by name, tag, origin, or description...", id="filter")
         yield Static("", id="warning", classes="-hidden")
         yield Vertical(id="groups")
+        yield Static("", id="empty-state")
         yield Static("", id="status")
         yield Footer()
 
@@ -1182,6 +1261,19 @@ class MainScreen(Screen):
                 continue
             groups.setdefault(self._group_key(s), []).append(s)
 
+        empty_state = self.query_one("#empty-state", Static)
+        if not groups:
+            if q:
+                empty_state.update(f"No skills match '{self.filter_text}'. Press Escape to clear the filter.")
+            else:
+                empty_state.update(
+                    "No skills found. Add skills to the library or add a local path via 'o' (Sources)."
+                )
+            empty_state.add_class("-visible")
+        else:
+            empty_state.update("")
+            empty_state.remove_class("-visible")
+
         def group_sort_key(origin: str) -> tuple[int, str]:
             if origin == "library":
                 return (0, origin)
@@ -1235,6 +1327,21 @@ class MainScreen(Screen):
             self._rebuild_groups()
             self._update_warning()
             self.update_status()
+
+    def on_key(self, event: KeyEvent) -> None:
+        """Escape while filter is focused: clear the filter and return focus to groups."""
+        if event.key == "escape":
+            fil = self.query_one("#filter", Input)
+            if fil.has_focus and fil.value:
+                fil.value = ""
+                event.stop()
+                return
+            if fil.has_focus:
+                # Filter already empty — move focus into the first SelectionList
+                event.stop()
+                lists = list(self.query("#groups SelectionList").results(SelectionList))
+                if lists:
+                    lists[0].focus()
 
     def action_focus_filter(self) -> None:
         self.query_one("#filter", Input).focus()
