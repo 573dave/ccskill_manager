@@ -27,6 +27,7 @@ try:
     from textual.app import App, ComposeResult
     from textual.binding import Binding
     from textual.containers import Horizontal, Vertical
+    from textual.events import Key as KeyEvent
     from textual.screen import ModalScreen, Screen
     from textual.widgets import (
         Button,
@@ -1327,7 +1328,7 @@ class MainScreen(Screen):
             self._update_warning()
             self.update_status()
 
-    def on_key(self, event) -> None:
+    def on_key(self, event: KeyEvent) -> None:
         """Escape while filter is focused: clear the filter and return focus to groups."""
         if event.key == "escape":
             fil = self.query_one("#filter", Input)
