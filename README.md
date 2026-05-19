@@ -14,13 +14,66 @@ pip install --user cc-skills
 
 Requires Python 3.10+.
 
+### Local development install
+
+```bash
+git clone https://github.com/yourname/cc-skills
+cd cc-skills
+pip install -e .        # editable install — picks up source changes immediately
+```
+
+After the editable install the `cc-skills` command is available in your shell just like a normal install.
+
+If you only want to run it without installing, install the single dependency and invoke `main.py` directly:
+
+```bash
+pip install textual
+python main.py
+```
+
 ## Run
 
 ```bash
-cc-skills
+cc-skills           # installed via pipx / pip
+# or, from the cloned repository without installing:
+python main.py
 ```
 
 No flags. Everything happens in the TUI.
+
+## Quick start: your first skill
+
+1. **Create a skill folder** in `~/.claude/skills-library/`:
+
+   ```bash
+   mkdir -p ~/.claude/skills-library/my-first-skill
+   ```
+
+2. **Add a `SKILL.md`** describing what the skill does. Claude Code looks for this file:
+
+   ```bash
+   cat > ~/.claude/skills-library/my-first-skill/SKILL.md << 'EOF'
+   # My First Skill
+
+   Describe what this skill teaches Claude here.
+   EOF
+   ```
+
+3. **Launch `cc-skills`**:
+
+   ```bash
+   cc-skills
+   ```
+
+4. **Choose a scope.** Select `~/.claude` (user-global) to make the skill available in every Claude Code session.
+
+5. **Enable the skill.** Your skill appears under the **library** group. Use the arrow keys to move to it, then press `Space` to check it.
+
+6. **Apply.** Press `a`. `cc-skills` writes a symlink `~/.claude/skills/my-first-skill → ../skills-library/my-first-skill`.
+
+7. **Restart Claude Code.** It re-reads `~/.claude/skills/` at session start and your skill is now active.
+
+> **Tip:** Repeat steps 1–2 for each additional skill you want to add to the library, then toggle them on or off any time from `cc-skills` without touching the actual files.
 
 ## What it does
 
