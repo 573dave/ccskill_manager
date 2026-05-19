@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cc-skills"
+version = "0.1.0"
+description = "TUI to manage which Claude Code skills are active via symlinks."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "cc-skills contributors" }]
+keywords = ["claude", "claude-code", "skills", "tui", "symlink", "plugin"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
+dependencies = ["textual>=0.60"]
+
+[project.urls]
+Homepage = "https://github.com/yourname/cc-skills"
+Issues = "https://github.com/yourname/cc-skills/issues"
+
+[project.scripts]
+cc-skills = "cc_skills:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cc_skills"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/cc_skills", "README.md", "LICENSE", "pyproject.toml"]
